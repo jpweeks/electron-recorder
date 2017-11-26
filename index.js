@@ -11,6 +11,8 @@ function createMovieRecorderStream (win, options_) {
 
   var ffmpegPath = options.ffmpeg || 'ffmpeg'
   var fps = options.fps || 60
+  var quality = mapLinear(0, 100, 32, 2,
+    options.quality || 70)
 
   var args = [
     '-y',
@@ -30,6 +32,10 @@ function createMovieRecorderStream (win, options_) {
   } else if (!outFile) {
     args.push('-f', 'matroska')
   }
+
+  args.push(
+    '-qscale', quality,
+    '-q:v', quality)
 
   if (outFile) {
     args.push(outFile)
@@ -77,4 +83,8 @@ function createMovieRecorderStream (win, options_) {
   }
 
   return result
+}
+
+function mapLinear (a1, a2, b1, b2, x) {
+  return b1 + (x - a1) * (b2 - b1) / (a2 - a1)
 }
