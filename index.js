@@ -1,4 +1,5 @@
 var spawn = require('child_process').spawn
+var ffmpegStatic = require('ffmpeg-static')
 
 module.exports = createMovieRecorderStream
 
@@ -6,10 +7,10 @@ function createMovieRecorderStream (win, options_) {
   var options = options_ || {}
 
   if (!win) {
-    throw new Error('electron-animator: you must specify a BrowserWindow')
+    throw new Error('electron-recorder: you must specify a BrowserWindow')
   }
 
-  var ffmpegPath = options.ffmpeg || 'ffmpeg'
+  var ffmpegPath = options.ffmpeg || ffmpegStatic.path
   var fps = options.fps || 60
   var quality = mapLinear(0, 100, 32, 2,
     options.quality || 70)
@@ -52,7 +53,7 @@ function createMovieRecorderStream (win, options_) {
     function tryCapture () {
       try {
         win.capturePage(function (image) {
-          var jpeg = image.toJpeg(100)
+          var jpeg = image.toJPEG(100)
           if (jpeg.length === 0) {
             setTimeout(tryCapture, 10)
           } else {

@@ -8,6 +8,7 @@
       const win = electron.remote.getCurrentWindow()
 
       win.setSize(200, 200)
+      win.webContents.openDevTools()
 
       const video = createVideoRecorder(win, {
         fps: 60,
