@@ -12,39 +12,76 @@ function createMovieRecorderStream (win, options_) {
 
   var ffmpegPath = options.ffmpeg || ffmpegStatic.path
   var fps = options.fps || 60
-  var quality = mapLinear(0, 100, 32, 2,
-    options.quality || 70)
+  var crf = options.crf || 18
+  var outFile = options.output || null
+  var log = options.log
 
-  var args = [
-    '-y',
-    '-f', 'image2pipe',
-    '-r', '' + (+fps),
-    // we use jpeg here because the most common version of ffmpeg (the one
-    // that ships with homebrew) is broken and crashes when you feed it PNG data
-    //  https://trac.ffmpeg.org/ticket/1272
-    '-vcodec', 'mjpeg',
-    '-i', '-'
-  ]
-
-  var outFile = options.output
-
-  if ('format' in options) {
-    args.push('-f', options.format)
-  } else if (!outFile) {
-    args.push('-f', 'matroska')
+  var api = {}
+  var processors = {}
+  var didSetupProcessors = false
+  function setupProcessors (image) {
+    if (didSetupProcessors) return processors
+    processors = createProcessors(image)
+    didSetupProcessors = true
   }
 
-  args.push(
-    '-qscale', quality,
-    '-q:v', quality)
+  // For some reason need the second processor to get a file readable by QuickTime
+  function createProcessors (image) {
+    var size = image.getSize()
 
-  if (outFile) {
-    args.push(outFile)
-  } else {
-    args.push('-')
+    // Raw bitmap image buffer stream encoded to lossless h264
+    var raw = spawn(ffmpegPath, [
+      '-y',
+      '-an',
+
+      '-r', '' + (+fps),
+      '-f', 'rawvideo',
+      '-video_size', size.width + 'x' + size.height,
+      '-pix_fmt', 'bgra',
+      '-i', '-',
+
+      '-f', 'h264',
+      '-c:v', 'libx264',
+      '-preset', 'ultrafast',
+      '-crf', '0',
+
+      '-'
+    ])
+
+    // Compressed h264 encoder
+    var out = spawn(ffmpegPath, [
+      '-y',
+      '-an',
+
+      '-i', '-',
+
+      '-c:v', 'libx264',
+      '-pix_fmt', 'yuv420p',
+      '-preset', 'ultrafast',
+      '-crf', crf,
+
+      outFile || '-'
+    ])
+
+    raw.stdout.on('data', function (data) {
+      out.stdin.write(data, function (err) {
+        if (err) throw err
+      })
+    })
+
+    raw.stdout.on('end', function () {
+      out.stdin.end()
+    })
+
+    out.stderr.on('data', function (data) {
+      if (log) log(data.toString())
+    })
+
+    return {
+      raw: raw,
+      out: out
+    }
   }
-
-  var ffmpeg = spawn(ffmpegPath, args)
 
   function appendFrame (next) {
     // This is dumb, but sometimes electron's capture fails silently and returns
@@ -53,14 +90,13 @@ function createMovieRecorderStream (win, options_) {
     function tryCapture () {
       try {
         win.capturePage(function (image) {
-          var jpeg = image.toJPEG(100)
-          if (jpeg.length === 0) {
-            setTimeout(tryCapture, 10)
-          } else {
-            ffmpeg.stdin.write(jpeg, function (err) {
-              next(err)
-            })
-          }
+          var buf = image.getBitmap()
+          if (buf.length === 0) return setTimeout(tryCapture, 10)
+
+          setupProcessors(image)
+          processors.raw.stdin.write(buf, function (err) {
+            next(err)
+          })
         })
       } catch (err) {
         next(err)
@@ -69,23 +105,13 @@ function createMovieRecorderStream (win, options_) {
     tryCapture()
   }
 
-  function endMovie () {
-    ffmpeg.stdin.end()
+  function endVideo () {
+    processors.raw.stdin.end()
   }
 
-  var result = {
-    frame: appendFrame,
-    end: endMovie,
-    log: ffmpeg.stderr
-  }
+  api.frame = appendFrame
+  api.end = endVideo
+  if (!outFile) api.stream = processors.out.stdout
 
-  if (!outFile) {
-    result.stream = ffmpeg.stdout
-  }
-
-  return result
-}
-
-function mapLinear (a1, a2, b1, b2, x) {
-  return b1 + (x - a1) * (b2 - b1) / (a2 - a1)
+  return api
 }

@@ -1,36 +1,65 @@
 <html>
   <body>
-    <h1>Test Movie</h1>
     <script>
       const electron = require('electron')
       const createVideoRecorder = require('../index')
 
-      const win = electron.remote.getCurrentWindow()
+      const DEBUG_DEV_TOOLS = false
+      const DEBUG_LEAVE_OPEN = false
+      const FRAME_COUNT = 60
 
-      win.setSize(200, 200)
-      win.webContents.openDevTools()
+      const win = electron.remote.getCurrentWindow()
+      const size = [200, 200]
+      const pxRatio = window.devicePixelRatio
+
+      win.setSize(size[0], size[1])
+      if (DEBUG_DEV_TOOLS) {
+        win.webContents.openDevTools()
+      }
+
+      const canvas = document.createElement('canvas')
+      const ctx = canvas.getContext('2d')
+
+      canvas.width = size[0] * pxRatio
+      canvas.height = size[1] * pxRatio
+      Object.assign(canvas.style, {
+        position: 'absolute',
+        top: '0',
+        left: '0',
+        width: `${size[0]}px`,
+        height: `${size[1]}px`
+      })
+      document.body.appendChild(canvas)
 
       const video = createVideoRecorder(win, {
         fps: 60,
-        output: 'test.mp4'
+        crf: 14,
+        output: 'test.mp4',
+        log: (str) => console.log(str)
       })
 
-      let frameCount = 360
+      let frameIndex = 0
       function renderFrame () {
-        const tag = document.querySelector('h1')
+        const t = frameIndex / (FRAME_COUNT - 1)
+        const gradient = ctx.createLinearGradient(size[0] * t, 0, size[0] * (1 - t), size[1])
+        gradient.addColorStop(0, 'cyan')
+        gradient.addColorStop(1, 'magenta')
 
-        Object.assign(tag.style, {
-          'width': 100,
-          'margin-left': 50,
-          'margin-top': 50,
-          '-webkit-transform': 'rotate(' + frameCount + 'deg)'
-        })
+        ctx.setTransform(pxRatio, 0, 0, pxRatio, 0, 0)
+        ctx.clearRect(0, 0, size[0], size[1])
+        ctx.fillStyle = gradient
+        ctx.fillRect(0, 0, size[0], size[1])
 
-        if (--frameCount > 0) {
+        ctx.fillStyle = '#fff'
+        ctx.font = '20px monospace'
+        ctx.textAlign = 'center'
+        ctx.fillText(`${frameIndex}`, size[0] * 0.5, size[1] * 0.5)
+
+        if (++frameIndex < FRAME_COUNT) {
           video.frame(renderFrame)
         } else {
           video.end()
-          win.close()
+          if (!DEBUG_LEAVE_OPEN) win.close()
         }
       }
 
