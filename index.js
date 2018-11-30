@@ -1,5 +1,5 @@
 var spawn = require('child_process').spawn
-var ffmpegStatic = require('ffmpeg-static')
+var ffmpegStatic = require('ffmpeg-static-electron')
 
 module.exports = createMovieRecorderStream
 
