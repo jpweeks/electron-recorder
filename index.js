@@ -71,9 +71,9 @@ function createMovieRecorderStream (win, options_) {
     // Pipe raw stream to compressor stream
     raw.stdout.on('data', function (data) {
       if (state.didEnd) return
-      isWriting = true
+      state.isWriting = true
       out.stdin.write(data, function (err) {
-        isWriting = false
+        state.isWriting = false
         if (err) throw err
       })
     })
@@ -87,7 +87,7 @@ function createMovieRecorderStream (win, options_) {
     function awaitWritingComplete (onComplete) {
       function willAwait () {
         if (state.isWriting) return setTimeout(willAwait, 100)
-        setTimeout(onComplete, 800)
+        setTimeout(onComplete, 200)
       }
       setTimeout(willAwait, 100)
     }
