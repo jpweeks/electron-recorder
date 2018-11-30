@@ -1,6 +1,6 @@
 {
   "name": "@microbium/electron-recorder",
-  "version": "3.2.0",
+  "version": "3.3.0",
   "description": "Record video with `electron` and `ffmpeg`",
   "main": "index.js",
   "directories": {
