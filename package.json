@@ -6,9 +6,7 @@
   "directories": {
     "example": "example"
   },
-  "dependencies": {
-    "ffmpeg-static-electron": "^2.0.1"
-  },
+  "dependencies": {},
   "devDependencies": {
     "electron": "^3.0.5"
   },

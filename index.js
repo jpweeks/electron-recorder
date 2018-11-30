@@ -1,5 +1,4 @@
 var spawn = require('child_process').spawn
-var ffmpegStatic = require('ffmpeg-static-electron')
 
 module.exports = createMovieRecorderStream
 
@@ -10,7 +9,7 @@ function createMovieRecorderStream (win, options_) {
     throw new Error('electron-recorder: you must specify a BrowserWindow')
   }
 
-  var ffmpegPath = options.ffmpeg || ffmpegStatic.path
+  var ffmpegPath = options.ffmpeg || 'ffmpeg'
   var fps = options.fps || 60
   var crf = options.crf || 18
   var outFile = options.output || null
