@@ -9,8 +9,11 @@
       const FRAME_COUNT = 60
 
       const win = electron.remote.getCurrentWindow()
-      const size = [200, 200]
       const pxRatio = window.devicePixelRatio
+      const size = [
+        Math.round(1280 / pxRatio),
+        Math.round(800 / pxRatio)
+      ]
 
       win.setSize(size[0], size[1])
       if (DEBUG_DEV_TOOLS) {
@@ -58,8 +61,9 @@
         if (++frameIndex < FRAME_COUNT) {
           video.frame(renderFrame)
         } else {
-          video.end()
-          if (!DEBUG_LEAVE_OPEN) win.close()
+          video.end(function () {
+            if (!DEBUG_LEAVE_OPEN) win.close()
+          })
         }
       }
 

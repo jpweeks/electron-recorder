@@ -28,6 +28,7 @@ function createMovieRecorderStream (win, options_) {
   // For some reason need the second processor to get a file readable by QuickTime
   function createProcessors (image) {
     var size = image.getSize()
+    var isWriting = false
 
     // Raw bitmap image buffer stream encoded to lossless h264
     var raw = spawn(ffmpegPath, [
@@ -63,23 +64,39 @@ function createMovieRecorderStream (win, options_) {
       outFile || '-'
     ])
 
+    // Pipe raw stream to compressor stream
     raw.stdout.on('data', function (data) {
+      isWriting = true
       out.stdin.write(data, function (err) {
+        isWriting = false
         if (err) throw err
       })
     })
 
-    raw.stdout.on('end', function () {
-      out.stdin.end()
-    })
-
+    // Send compressor stream info to log
     out.stderr.on('data', function (data) {
       if (log) log(data.toString())
     })
 
+    function awaitWritingComplete (onComplete) {
+      (function willAwait () {
+        if (isWriting) return setTimeout(willAwait, 100)
+        setTimeout(onComplete, 100)
+      })()
+    }
+
+    function end (done) {
+      processors.raw.stdin.end()
+      awaitWritingComplete(function () {
+        out.stdin.end()
+        done()
+      })
+    }
+
     return {
       raw: raw,
-      out: out
+      out: out,
+      end: end
     }
   }
 
@@ -105,8 +122,8 @@ function createMovieRecorderStream (win, options_) {
     tryCapture()
   }
 
-  function endVideo () {
-    processors.raw.stdin.end()
+  function endVideo (done) {
+    processors.end(done)
   }
 
   api.frame = appendFrame
