@@ -28,11 +28,14 @@ function createMovieRecorderStream (win, options_) {
   // For some reason need the second processor to get a file readable by QuickTime
   function createProcessors (image) {
     var size = image.getSize()
-    var isWriting = false
+    var state = {
+      isWriting: false,
+      isEnding: false,
+      didEnd: false
+    }
 
     // Raw bitmap image buffer stream encoded to lossless h264
     var raw = spawn(ffmpegPath, [
-      '-y',
       '-an',
 
       '-r', '' + (+fps),
@@ -54,6 +57,7 @@ function createMovieRecorderStream (win, options_) {
       '-y',
       '-an',
 
+      '-r', '' + (+fps),
       '-i', '-',
 
       '-c:v', 'libx264',
@@ -66,6 +70,7 @@ function createMovieRecorderStream (win, options_) {
 
     // Pipe raw stream to compressor stream
     raw.stdout.on('data', function (data) {
+      if (state.didEnd) return
       isWriting = true
       out.stdin.write(data, function (err) {
         isWriting = false
@@ -78,22 +83,31 @@ function createMovieRecorderStream (win, options_) {
       if (log) log(data.toString())
     })
 
+    // FIXME: Ends before all frames are flushed to out
     function awaitWritingComplete (onComplete) {
-      (function willAwait () {
-        if (isWriting) return setTimeout(willAwait, 100)
-        setTimeout(onComplete, 100)
-      })()
+      function willAwait () {
+        if (state.isWriting) return setTimeout(willAwait, 100)
+        setTimeout(onComplete, 800)
+      }
+      setTimeout(willAwait, 100)
     }
 
     function end (done) {
-      processors.raw.stdin.end()
+      if (!state.isEnding) {
+        state.isEnding = true
+        processors.raw.stdin.end()
+      }
       awaitWritingComplete(function () {
-        out.stdin.end()
-        done()
+        if (!state.didEnd) {
+          state.didEnd = true
+          out.stdin.end()
+        }
+        if (done) done()
       })
     }
 
     return {
+      state: state,
       raw: raw,
       out: out,
       end: end
@@ -111,6 +125,8 @@ function createMovieRecorderStream (win, options_) {
           if (buf.length === 0) return setTimeout(tryCapture, 10)
 
           setupProcessors(image)
+          if (processors.state.isEnding) return
+
           processors.raw.stdin.write(buf, function (err) {
             next(err)
           })
